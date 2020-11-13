@@ -1,12 +1,14 @@
 import open3d as o3d
-from utils.read_pcd import read_pcd
+from utils.utils import read_pcd, read_obj
 
 
-input_path = "output_data/"
-pcd = read_pcd(input_path)
-center = pcd.get_center()
-print(center)
+pcd_path, obj_path = "point_clouds/", "models/"
+pcd = read_pcd(pcd_path)
+obj = read_obj(obj_path)
+pcd_center, obj_center = pcd.get_center(), obj.get_center()
+print(pcd_center, "\n", obj_center)
 
-o3d.visualization.draw_geometries([pcd],
+
+o3d.visualization.draw_geometries([pcd, obj],
                                   point_show_normal=False,
                                   mesh_show_back_face=False)
