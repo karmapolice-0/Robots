@@ -5,6 +5,22 @@ import copy
 import open3d as o3d
 
 
+def preprocess_point_cloud(pcd, voxel_size):
+    print(":: Downsample with a voxel size %.3f." % voxel_size)
+    pcd_down = pcd.voxel_down_sample(voxel_size)
+
+    radius_normal = voxel_size * 2
+    print(":: Estimate normal with search radius %.3f." % radius_normal)
+    pcd_down.estimate_normals(
+        o3d.geometry.KDTreeSearchParamHybrid(radius=radius_normal, max_nn=30))
+
+    radius_feature = voxel_size * 5
+    print(":: Compute FPFH feature with search radius %.3f." % radius_feature)
+    pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(
+        pcd_down,
+        o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn=100))
+    return pcd_down, pcd_fpfh
+
 def demo_crop_geometry():
     print("Demo for manual geometry cropping")
     print(
@@ -19,8 +35,8 @@ def demo_crop_geometry():
     o3d.visualization.draw_geometries_with_editing([pcd])
 
 
-def draw_registration_result(source, target, transformation):
-    source_temp = copy.deepcopy(source)
+def draw_registration_result(source_s, target, transformation):
+    source_temp = copy.deepcopy(source_s)
     target_temp = copy.deepcopy(target)
     source_temp.paint_uniform_color([1, 0.706, 0])
     target_temp.paint_uniform_color([0, 0.651, 0.929])
@@ -43,13 +59,14 @@ def pick_points(pcd):
     print("")
     return vis.get_picked_points()
 
-
 def demo_manual_registration():
     print("Demo for manual ICP")
-    source = o3d.io.read_point_cloud('cube3.txt', format='xyzn')
-    source = source.voxel_down_sample(0.9)
-    target = o3d.io.read_triangle_mesh("cube.obj")
-    target = target.sample_points_uniformly(number_of_points=50000)
+    target = o3d.io.read_point_cloud('cube3.txt', format='xyzn')
+    target = target.voxel_down_sample(0.4)
+    source_s = o3d.io.read_triangle_mesh("cube.obj")
+    source = source_s.sample_points_uniformly(number_of_points=50000)
+    source.paint_uniform_color([1, 0.706, 0])
+    target.paint_uniform_color([0, 0.651, 0.929])
     print("Visualization of two point clouds before manual alignment")
     draw_registration_result(source, target, np.identity(4))
 
@@ -71,10 +88,25 @@ def demo_manual_registration():
     # point-to-point ICP for refinement
     print("Perform point-to-point ICP refinement")
     threshold = 0.01  # 3cm distance threshold
+
+    # sf = o3d.pipelines.registration.Feature(source)
+    # tf = o3d.pipelines.registration.Feature(target)
+
+    # reg_p2p = o3d.pipelines.registration.registration_ransac_based_on_correspondence(
+    #     source, target,o3d.utility.Vector2iVector(corr), threshold,
+    #     o3d.pipelines.registration.TransformationEstimationPointToPoint()
+    # )
+
+    # source_down, source_fpfh = preprocess_point_cloud(source, 1)
+    # target_down, target_fpfh = preprocess_point_cloud(target, 1)
+    # reg_p2p = o3d.pipelines.registration.registration_ransac_based_on_feature_matching(
+    #     source_down, target_down, source_fpfh, target_fpfh, trans_init,
+    #     o3d.pipelines.registration.TransformationEstimationPointToPoint()
+    # )
     reg_p2p = o3d.pipelines.registration.registration_icp(
         source, target, threshold, trans_init,
         o3d.pipelines.registration.TransformationEstimationPointToPoint())
-    draw_registration_result(source, target, reg_p2p.transformation)
+    draw_registration_result(source_s, target, reg_p2p.transformation)
     print("")
 
 
